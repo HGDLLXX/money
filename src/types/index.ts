@@ -10,11 +10,9 @@ export type PaymentMethod =
   | 'transfer'
   | 'other';
 
-export interface User {
+export interface Profile {
   id: string;
-  email: string;
   name: string;
-  password_hash: string;
   currency: string;
   date_format: string;
   monthly_budget: number;
@@ -59,6 +57,7 @@ export interface RecurringTransaction {
   frequency: RecurrenceFrequency;
   start_date: string;
   next_date: string;
+  day_of_month: number;
   payment_method: PaymentMethod | null;
   description: string | null;
   is_paused: boolean;
@@ -91,7 +90,7 @@ export interface GoalContribution {
   id: string;
   goal_id: string;
   user_id: string;
-  amount: number;
+  amount: number; // positive = deposit, negative = withdrawal
   date: string;
   created_at: string;
 }
