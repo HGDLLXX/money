@@ -1,0 +1,2 @@
+[functions.process-recurring]
+verify_jwt = false
