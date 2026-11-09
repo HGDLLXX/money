@@ -81,16 +81,10 @@ export async function deleteCategory(
   id: string,
   reassignTo: string | null
 ): Promise<void> {
-  if (reassignTo) {
-    await supabase.from('transactions').update({ category_id: reassignTo }).eq('category_id', id);
-    await supabase.from('recurring_transactions').update({ category_id: reassignTo }).eq('category_id', id);
-    await supabase.from('budgets').delete().eq('category_id', id);
-  } else {
-    await supabase.from('transactions').update({ category_id: null }).eq('category_id', id);
-    await supabase.from('recurring_transactions').update({ category_id: null }).eq('category_id', id);
-    await supabase.from('budgets').delete().eq('category_id', id);
-  }
-  const { error } = await supabase.from('categories').delete().eq('id', id);
+  const { error } = await supabase.rpc('delete_category', {
+    p_category_id: id,
+    p_reassign_to: reassignTo,
+  });
   if (error) throw error;
 }
 
@@ -213,11 +207,6 @@ export async function getRecurringTransactions(userId: string): Promise<Recurrin
   return (data as RecurringTransaction[]) ?? [];
 }
 
-function computeDayOfMonth(startDate: string): number {
-  const d = new Date(startDate + 'T00:00:00');
-  return d.getDate();
-}
-
 export async function createRecurringTransaction(
   userId: string,
   data: {
@@ -231,25 +220,27 @@ export async function createRecurringTransaction(
     description: string | null;
   }
 ): Promise<RecurringTransaction> {
-  const dayOfMonth = computeDayOfMonth(data.start_date);
-  const { data: row, error } = await supabase
-    .from('recurring_transactions')
-    .insert({
-      user_id: userId,
-      type: data.type,
-      name: data.name,
-      amount: data.amount,
-      category_id: data.category_id,
-      frequency: data.frequency,
-      start_date: data.start_date,
-      next_date: data.start_date,
-      day_of_month: dayOfMonth,
-      payment_method: data.payment_method,
-      description: data.description,
-    })
-    .select()
-    .single();
+  const { data: rpcData, error } = await supabase.rpc('create_recurring_with_transaction', {
+    p_user_id: userId,
+    p_type: data.type,
+    p_name: data.name,
+    p_amount: data.amount,
+    p_category_id: data.category_id,
+    p_frequency: data.frequency,
+    p_start_date: data.start_date,
+    p_payment_method: data.payment_method,
+    p_description: data.description,
+  });
   if (error) throw error;
+
+  // Fetch the created recurring row
+  const recurringId = rpcData as string;
+  const { data: row, error: fetchError } = await supabase
+    .from('recurring_transactions')
+    .select('*')
+    .eq('id', recurringId)
+    .single();
+  if (fetchError) throw fetchError;
   return row as RecurringTransaction;
 }
 

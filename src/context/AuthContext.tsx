@@ -56,23 +56,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted) return;
-      const authUser = await fetchAuthUser(session);
-      if (mounted) {
-        setUser(authUser);
-        setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+        const authUser = await fetchAuthUser(session);
+        if (mounted) {
+          setUser(authUser);
+        }
+      } catch (err) {
+        console.error('Session init error:', err);
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       (async () => {
-        if (session?.user) {
-          await processRecurringTransactions(session.user.id);
-          await seedCategoriesIfEmpty(session.user.id);
+        try {
+          if (session?.user) {
+            await processRecurringTransactions(session.user.id);
+            await seedCategoriesIfEmpty(session.user.id);
+          }
+          const authUser = await fetchAuthUser(session);
+          if (mounted) setUser(authUser);
+        } catch (err) {
+          console.error('Auth state change error:', err);
+        } finally {
+          if (mounted) setLoading(false);
         }
-        const authUser = await fetchAuthUser(session);
-        if (mounted) setUser(authUser);
       })();
     });
 
